@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Text Detector</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body>
+  <main class="container">
+    <h1>Detector probabilístico de texto asistido por IA</h1>
+    <p class="subtitle">Analiza señales lingüísticas, estructurales y semánticas para estimar probabilidad de uso de IA.</p>
+
+    <section class="card">
+      <label for="inputText">Texto a analizar</label>
+      <textarea id="inputText" rows="12" placeholder="Pega aquí tu texto..."></textarea>
+      <button id="analyzeBtn">Analizar</button>
+      <p class="disclaimer">Este resultado es orientativo y no constituye una prueba definitiva.</p>
+      <div id="warnings"></div>
+    </section>
+
+    <section id="results" class="hidden">
+      <div class="score-panel card">
+        <div>
+          <h2>Puntaje global</h2>
+          <p id="scoreValue" class="score">0</p>
+          <p id="riskLabel"></p>
+        </div>
+        <div class="risk-bar-wrapper">
+          <div id="riskBar" class="risk-bar"></div>
+        </div>
+      </div>
+
+      <section class="card">
+        <h3>Explicación interpretable</h3>
+        <p id="headline"></p>
+        <ul id="explanations"></ul>
+      </section>
+
+      <section class="card">
+        <h3>Features numéricas</h3>
+        <table>
+          <thead><tr><th>Feature</th><th>Valor</th></tr></thead>
+          <tbody id="featureTable"></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h3>Análisis por oración</h3>
+        <div id="sentenceAnalysis"></div>
+      </section>
+
+      <section class="card">
+        <h3>Análisis por párrafo</h3>
+        <div id="paragraphAnalysis"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
