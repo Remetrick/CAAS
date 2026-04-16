@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Barrio Lastarria | Ruta Animada</title>
+  <style>
+    :root {
+      --map-w: 1536;
+      --map-h: 1152;
+      --route: #ffcc00;
+      --route-soft: rgba(255, 204, 0, 0.45);
+      --ui-bg: rgba(15, 23, 42, 0.82);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 0%, #1f2937 0%, #020617 60%);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: #e5e7eb;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .app {
+      width: min(96vw, calc(var(--map-w) * 1px));
+      display: grid;
+      gap: 10px;
+    }
+
+    .map-shell {
+      position: relative;
+      width: 100%;
+      aspect-ratio: calc(var(--map-w) / var(--map-h));
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 24px 55px rgba(0, 0, 0, 0.5);
+      background: #111827;
+    }
+
+    .base-map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+    }
+
+    .route-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .route-track {
+      fill: none;
+      stroke: rgba(255,255,255,0.16);
+      stroke-width: 7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .route-glow {
+      fill: none;
+      stroke: var(--route-soft);
+      stroke-width: 20;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: blur(2px);
+      opacity: .85;
+    }
+
+    .route-main {
+      fill: none;
+      stroke: var(--route);
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 8px rgba(255, 204, 0, 0.8));
+    }
+
+    .markers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .marker {
+      position: absolute;
+      transform: translate(-50%, -100%) scale(.88);
+      opacity: 0;
+      transition: opacity 320ms ease, transform 320ms ease;
+      transform-origin: 50% 85%;
+      min-width: 170px;
+      max-width: 290px;
+    }
+
+    .marker.visible {
+      opacity: 1;
+      transform: translate(-50%, -100%) scale(1);
+    }
+
+    .marker.pulse {
+      animation: pop 900ms ease-out;
+    }
+
+    @keyframes pop {
+      0% { transform: translate(-50%, -100%) scale(0.8); }
+      35% { transform: translate(-50%, -100%) scale(1.1); }
+      100% { transform: translate(-50%, -100%) scale(1); }
+    }
+
+    .marker-photo {
+      width: 100%;
+      aspect-ratio: 2.2 / 1;
+      border-radius: 999px;
+      border: 4px solid #da7e4d;
+      background-size: cover;
+      background-position: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.26);
+    }
+
+    .marker-pin {
+      position: absolute;
+      left: 24%;
+      bottom: 16px;
+      width: 34px;
+      height: 48px;
+      border-radius: 18px 18px 18px 0;
+      background: linear-gradient(180deg, #ffd16a 0%, #ffb143 65%, #ec7d3f 100%);
+      transform: rotate(-45deg);
+      border: 2px solid #a95e34;
+      box-shadow: 0 4px 9px rgba(0,0,0,0.22);
+    }
+
+    .marker-pin::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff7d9;
+      border: 4px solid #e8bd37;
+      top: 7px;
+      left: 7px;
+    }
+
+    .marker-label {
+      margin-top: 6px;
+      display: inline-block;
+      background: #ece4d2;
+      border: 2px solid #948c79;
+      color: #334155;
+      border-radius: 22px;
+      padding: 10px 14px;
+      font-size: clamp(14px, 1.75vw, 22px);
+      font-weight: 600;
+      line-height: 1.08;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.16);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .35s ease, transform .35s ease;
+    }
+
+    .marker.visible .marker-label {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .controls {
+      background: var(--ui-bg);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .progress-wrap {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    progress {
+      width: 100%;
+      height: 14px;
+      border-radius: 999px;
+      overflow: hidden;
+      appearance: none;
+    }
+
+    progress::-webkit-progress-bar { background: rgba(148,163,184,.3); }
+    progress::-webkit-progress-value {
+      background: linear-gradient(90deg, #ffd233 0%, #ffcc00 100%);
+      border-radius: 999px;
+    }
+
+    .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #0f172a;
+      background: #fcd34d;
+    }
+
+    button.secondary { background: #cbd5e1; }
+    .small { font-size: 12px; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="map-shell" aria-label="Mapa animado Barrio Lastarria">
+      <!-- Usa la imagen de referencia EXACTA para conservar 100% calles/bloques/proporciones -->
+      <img
+        class="base-map"
+        id="baseMap"
+        src="./lastarria_reference.png"
+        alt="Mapa base Barrio Lastarria"
+      />
+
+      <svg class="route-layer" viewBox="0 0 1536 1152" aria-hidden="true">
+        <!-- Ruta exacta: Liguria -> Papacheco -> Veracruz -> Parque -> Palacio -> Merced(izq) -> Museo -->
+        <path id="routeTrack" class="route-track" d="M860 505 C860 575,860 655,860 735 C860 815,860 885,860 945 C855 860,910 720,980 560 C1018 470,1050 390,1062 340 C1120 340,1170 338,1215 332 C1110 333,960 334,790 334 C650 334,470 334,280 335"/>
+        <path id="routeGlow" class="route-glow" d="M860 505 C860 575,860 655,860 735 C860 815,860 885,860 945 C855 860,910 720,980 560 C1018 470,1050 390,1062 340 C1120 340,1170 338,1215 332 C1110 333,960 334,790 334 C650 334,470 334,280 335"/>
+        <path id="routeMain" class="route-main" d="M860 505 C860 575,860 655,860 735 C860 815,860 885,860 945 C855 860,910 720,980 560 C1018 470,1050 390,1062 340 C1120 340,1170 338,1215 332 C1110 333,960 334,790 334 C650 334,470 334,280 335"/>
+      </svg>
+
+      <div class="markers" id="markers"></div>
+    </section>
+
+    <section class="controls" aria-label="Controles de reproducción">
+      <div class="progress-wrap">
+        <progress id="progressBar" value="0" max="100"></progress>
+        <strong id="progressText">0%</strong>
+      </div>
+      <div class="buttons">
+        <button id="playBtn">Reproducir ruta</button>
+        <button id="restartBtn" class="secondary">Reiniciar</button>
+      </div>
+      <div class="small">Duración: ~6s | easing: ease-in-out | estilo neón #FFCC00</div>
+    </section>
+  </main>
+
+  <script>
+    const DURATION_MS = 6000;
+
+    const routeMain = document.getElementById('routeMain');
+    const routeGlow = document.getElementById('routeGlow');
+    const routeTrack = document.getElementById('routeTrack');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const playBtn = document.getElementById('playBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const markersRoot = document.getElementById('markers');
+
+    const stops = [
+      { id: 'liguria', name: 'Bar Liguria\nLastarria', x: 860, y: 505, at: 0.00, photo: 'linear-gradient(135deg,#9ec5f8,#4478b8)' },
+      { id: 'papacheco', name: 'Papacheco', x: 860, y: 735, at: 0.22, photo: 'linear-gradient(135deg,#8f8f8f,#4f4f4f)' },
+      { id: 'veracruz', name: 'Iglesia de la\nVeracruz', x: 860, y: 945, at: 0.36, photo: 'linear-gradient(135deg,#df8a6f,#a74230)' },
+      { id: 'palacio', name: 'Palacio Bruna', x: 1062, y: 340, at: 0.72, photo: 'linear-gradient(135deg,#98c5f4,#5f7ea5)' },
+      { id: 'museo', name: 'Museo Nacional\nde Bellas Artes', x: 280, y: 335, at: 1.00, photo: 'linear-gradient(135deg,#c8d4e5,#7c8ea5)' }
+    ];
+
+    function createMarker(stop) {
+      const marker = document.createElement('article');
+      marker.className = 'marker';
+      marker.dataset.id = stop.id;
+      marker.style.left = `${(stop.x / 1536) * 100}%`;
+      marker.style.top = `${(stop.y / 1152) * 100}%`;
+
+      const photo = document.createElement('div');
+      photo.className = 'marker-photo';
+      photo.style.background = stop.photo;
+
+      const pin = document.createElement('div');
+      pin.className = 'marker-pin';
+
+      const label = document.createElement('div');
+      label.className = 'marker-label';
+      label.innerHTML = stop.name.replace(/\n/g, '<br>');
+
+      marker.append(photo, pin, label);
+      return marker;
+    }
+
+    const markerEls = new Map();
+    stops.forEach((s) => {
+      const el = createMarker(s);
+      markerEls.set(s.id, el);
+      markersRoot.appendChild(el);
+    });
+
+    const pathLength = routeMain.getTotalLength();
+    [routeMain, routeGlow, routeTrack].forEach((p) => {
+      p.style.strokeDasharray = `${pathLength}`;
+      p.style.strokeDashoffset = `${pathLength}`;
+    });
+    routeTrack.style.strokeDashoffset = 0;
+
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function setProgress(rawT) {
+      const t = Math.max(0, Math.min(1, rawT));
+      const eased = easeInOutCubic(t);
+      const drawOffset = pathLength * (1 - eased);
+
+      routeMain.style.strokeDashoffset = drawOffset;
+      routeGlow.style.strokeDashoffset = drawOffset;
+
+      const percent = Math.round(t * 100);
+      progressBar.value = percent;
+      progressText.textContent = `${percent}%`;
+
+      stops.forEach((s) => {
+        const marker = markerEls.get(s.id);
+        const isVisible = eased >= s.at;
+        if (isVisible && !marker.classList.contains('visible')) {
+          marker.classList.add('visible', 'pulse');
+          setTimeout(() => marker.classList.remove('pulse'), 920);
+        }
+      });
+    }
+
+    let raf = 0;
+    let startAt = 0;
+    let running = false;
+
+    function animate(now) {
+      if (!running) return;
+      const elapsed = now - startAt;
+      const t = Math.min(1, elapsed / DURATION_MS);
+      setProgress(t);
+      if (t < 1) {
+        raf = requestAnimationFrame(animate);
+      } else {
+        running = false;
+      }
+    }
+
+    function play() {
+      cancelAnimationFrame(raf);
+      running = true;
+      startAt = performance.now();
+      raf = requestAnimationFrame(animate);
+    }
+
+    function reset() {
+      cancelAnimationFrame(raf);
+      running = false;
+      setProgress(0);
+      markerEls.forEach((m) => m.classList.remove('visible', 'pulse'));
+    }
+
+    playBtn.addEventListener('click', play);
+    restartBtn.addEventListener('click', () => {
+      reset();
+      play();
+    });
+
+    reset();
+  </script>
+</body>
+</html>
